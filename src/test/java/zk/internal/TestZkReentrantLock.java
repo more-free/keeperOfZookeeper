@@ -15,7 +15,7 @@ public class TestZkReentrantLock {
     @Test
     public void testUnlockAll() throws Exception {
         ZkReentrantLock.unlockAll();
-        System.out.println(ZkManager.getInstance().getChildren("/zk/internal/util/concurrent/lock", false));
+        System.out.println(ZkManager.getInstance().getChildren(ZkReentrantLock.PREFIX, false));
     }
 
 

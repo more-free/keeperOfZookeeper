@@ -18,7 +18,8 @@ import static zk.util.Utils.*;
  */
 public class ZkReentrantLock implements ZkLock {
     private ZooKeeper zk = ZkManager.getInstance();
-    private static final String prefix = "/zk/internal/util/concurrent/lock";
+    static final String PREFIX = "/zk/internal/util/concurrent/reentrant-lock";
+    static final String GROUP = "lock-";
 
     private volatile boolean isPathCreated = false;
     private ThreadLocal<String> name = new ThreadLocal<>();
@@ -26,14 +27,14 @@ public class ZkReentrantLock implements ZkLock {
 
     @Override
     public void lock() throws KeeperException, InterruptedException {
-        if(holdTheLock.get() != null && holdTheLock.get())
+        if(checkReentrancy())
             return;  // if already hold the lock, then return instantly
 
         if(!isPathCreated) {
             synchronized (this) {
                 if(!isPathCreated) {
                     try {
-                        createRecursively(prefix, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                        createRecursively(PREFIX, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     } catch(KeeperException | InterruptedException e) {
                         // ignore
                     }
@@ -42,10 +43,10 @@ public class ZkReentrantLock implements ZkLock {
             }
         }
 
-        String fullName = zk.create(prefix + "/lock-", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+        String fullName = zk.create(PREFIX + "/" + GROUP, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
         name.set(lastElement(fullName.split("/")));
 
-        List<String> children = zk.getChildren(prefix, false);
+        List<String> children = zk.getChildren(PREFIX, false);
         Collections.sort(children);
 
         if(name.get().equals(children.get(0))) {
@@ -55,7 +56,7 @@ public class ZkReentrantLock implements ZkLock {
             int prev = children.indexOf(name.get()) - 1;
 
             CountDownLatch latch = new CountDownLatch(1);
-            Stat stat = zk.exists(prefix + "/" + children.get(prev), event -> {
+            Stat stat = zk.exists(PREFIX + "/" + children.get(prev), event -> {
                  if(event.getType() == Watcher.Event.EventType.NodeDeleted) {
                     latch.countDown();
                  }
@@ -77,12 +78,16 @@ public class ZkReentrantLock implements ZkLock {
     public void unlock() throws KeeperException, InterruptedException {
         holdTheLock.set(false);
 
-        zk.delete(prefix + "/" + name.get(), -1);
+        zk.delete(PREFIX + "/" + name.get(), -1);
         name.set(null);
     }
 
+    private boolean checkReentrancy() {
+        return holdTheLock.get() != null && holdTheLock.get();
+    }
+
     public static void unlockAll() {
-        ZkUtil.removeRecursively(prefix, false);
+        ZkUtil.removeRecursively(PREFIX, false);
     }
 
 }
