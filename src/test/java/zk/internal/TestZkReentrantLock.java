@@ -12,14 +12,14 @@ import java.util.concurrent.TimeUnit;
  * Created by morefree on 9/12/14.
  */
 public class TestZkReentrantLock {
-    @Test
+    //@Test
     public void testUnlockAll() throws Exception {
         ZkReentrantLock.unlockAll();
         System.out.println(ZkManager.getInstance().getChildren(ZkReentrantLock.PREFIX, false));
     }
 
 
-    @Test
+    //@Test
     public void testLockWithThreads() throws Exception {
         try {
             testUnlockAll();
@@ -52,7 +52,7 @@ public class TestZkReentrantLock {
         threads.stream().forEach(t -> { try{ t.join(); } catch(Exception e){} });
     }
 
-    @AfterClass
+    //@AfterClass
     public static void cleanUp() {
         try {
             ZkManager.close();

@@ -19,6 +19,9 @@ import java.util.List;
 public class ZkUtil {
     private static ZooKeeper zk = ZkManager.getInstance();
 
+    public static final Integer MAX_SEQUENTIAL_VALUE = 2147483647;
+    public static final Integer MIN_SEQUENTIAL_VALUE = -2147483647;
+
     public static void createRecursively(String path, byte [] data, List<ACL> aclList, CreateMode mode)
             throws KeeperException, InterruptedException {
         List<String> nodes = split(path);
@@ -91,6 +94,21 @@ public class ZkUtil {
 
     public static void removeRecursively(String path) {
         removeRecursively(path, true);
+    }
+
+    /**
+     * @param name node-0000000001
+     * @return node-0000000002
+     */
+    public static String nextSequentialName(String name) {
+        String [] parts = name.split("-");
+        if(parts.length == 3) parts[1] = "-" + parts[2]; // negative number
+
+        Integer val = Integer.parseInt(parts[1]);
+        if(val.equals(MAX_SEQUENTIAL_VALUE))
+            return parts[0] + "-" + MIN_SEQUENTIAL_VALUE;
+        else
+            return parts[0] + "-" + String.format("%010d", val + 1);
     }
 
     private static List<String> split(String path) {

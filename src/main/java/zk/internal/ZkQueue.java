@@ -14,6 +14,6 @@ import java.util.concurrent.TimeUnit;
  */
 public interface ZkQueue <T> {
     void offer(T e) throws IOException, KeeperException, InterruptedException;
-    T peek() throws IOException, KeeperException, InterruptedException;
-    T poll() throws IOException, KeeperException, InterruptedException;
+    T peek() throws IOException, KeeperException, InterruptedException, ClassNotFoundException;
+    T poll() throws IOException, KeeperException, InterruptedException, ClassNotFoundException;
 }

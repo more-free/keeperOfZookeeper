@@ -25,6 +25,10 @@ public class ZkReentrantLock implements ZkLock {
     private ThreadLocal<String> name = new ThreadLocal<>();
     private ThreadLocal<Boolean> holdTheLock = new ThreadLocal<>();
 
+    public ZkReentrantLock() {
+
+    }
+
     @Override
     public void lock() throws KeeperException, InterruptedException {
         if(checkReentrancy())

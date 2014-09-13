@@ -28,4 +28,6 @@ public interface Serializer {
             return objStream.readObject();
         }
     }
+
+    public static Serializer defaultSerializer = new Serializer() { };
 }
