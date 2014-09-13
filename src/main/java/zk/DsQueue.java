@@ -31,6 +31,5 @@ public class DsQueue  {
 
     public void flush() {
      // TODO batch flush
-
     }
 }
