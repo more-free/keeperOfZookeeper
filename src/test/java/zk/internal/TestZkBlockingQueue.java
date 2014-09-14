@@ -13,9 +13,10 @@ import java.util.concurrent.TimeUnit;
 public class TestZkBlockingQueue {
     @Test
     public void testZkBlockingQueue() throws Exception {
-        ZkQueue<String> queue = new ZkBlockingQueue<>(Serializer.defaultSerializer);
         ZkReentrantLock.unlockAll();
         ZkBlockingQueue.deleteAll();
+
+        ZkQueue<String> queue = new ZkBlockingQueue<>(Serializer.defaultSerializer);
 
         new Thread(() -> {
             try {

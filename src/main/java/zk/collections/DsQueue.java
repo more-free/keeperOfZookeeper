@@ -1,6 +1,7 @@
-package zk;
+package zk.collections;
 
 import org.apache.zookeeper.ZooKeeper;
+import zk.ZkManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,6 @@ public class DsQueue  {
     }
 
     public void flush() {
-     // TODO batch flush
+        // TODO batch flush
     }
 }

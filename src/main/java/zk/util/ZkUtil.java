@@ -76,6 +76,7 @@ public class ZkUtil {
         if(!children.isEmpty()) {
             children.stream().forEach(c -> {
                 try {
+                    // delete all sub-nodes and self
                     ZKUtil.deleteRecursive(zk, path + "/" + c);
                 } catch(KeeperException | InterruptedException e) {
                     throw new RuntimeException(e);

@@ -32,15 +32,36 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
     private Serializer serializer;
     private ZkLock zkLock = new ZkReentrantLock();
 
+    private String queueName = "default";
+    private String thisPrefix;
+    private String thisNextNode;
+
+    public String getQueueName() {
+        return this.queueName;
+    }
+
     public ZkBlockingQueue(Serializer serializer) {
         this.serializer = serializer;
+        init();
+    }
+
+    public ZkBlockingQueue(Serializer serializer, String queueName) {
+        this.serializer = serializer;
+        this.queueName = queueName;
+        init();
+    }
+
+    private void init() {
+        thisPrefix = PREFIX + "/" + queueName;
+        thisNextNode = NEXT_NODE + "/" + queueName;
 
         if(!isPathCreated) {
             try {
-                createRecursively(PREFIX, null, DEFAULT_ACL_LIST, CreateMode.PERSISTENT);
-                createRecursively(NEXT_NODE, " ".getBytes(), DEFAULT_ACL_LIST, CreateMode.PERSISTENT);
+                createRecursively(thisPrefix, null, DEFAULT_ACL_LIST, CreateMode.PERSISTENT);
+                createRecursively(thisNextNode, " ".getBytes(), DEFAULT_ACL_LIST, CreateMode.PERSISTENT);
             } catch(KeeperException | InterruptedException e) {
-                // ignore
+                // when path already exists exceptions are thrown
+                // ignore exceptions
             }
             isPathCreated = true;
         }
@@ -48,7 +69,7 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
 
     @Override
     public void offer(T t) throws IOException, KeeperException, InterruptedException {
-        zk.create(PREFIX + "/" + GROUP, serializer.serialize(t), DEFAULT_ACL_LIST, CreateMode.PERSISTENT_SEQUENTIAL);
+        zk.create(thisPrefix + "/" + GROUP, serializer.serialize(t), DEFAULT_ACL_LIST, CreateMode.PERSISTENT_SEQUENTIAL);
     }
 
     /**
@@ -59,7 +80,7 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
      */
     @Override
     public T peek() throws ClassNotFoundException, IOException, KeeperException, InterruptedException {
-        String nextNodeName = new String(zk.getData(NEXT_NODE, false, null));
+        String nextNodeName = new String(zk.getData(thisNextNode, false, null));
         if(!validName(nextNodeName))  // first peek. queue is empty now.
             return null;
 
@@ -89,18 +110,18 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
 
             // read the name of the next node of the queue. If there is no next node (queue is empty),
             // then it blocks until next node comes in.
-            String nextNodeName = new String(zk.getData(NEXT_NODE, false, null)); // ex. n-000000001
+            String nextNodeName = new String(zk.getData(thisNextNode, false, null)); // ex. n-000000001
 
             if (!validName(nextNodeName)) { // first poll. queue is empty now.
                 CountDownLatch latch = new CountDownLatch(1);
-                List<String> children = zk.getChildren(PREFIX, event -> {
+                List<String> children = zk.getChildren(thisPrefix, event -> {
                    if(event.getType() == Watcher.Event.EventType.NodeChildrenChanged)
                        latch.countDown();
                 });
 
                 if(children == null || children.size() == 0) {
                     latch.await();
-                    children = zk.getChildren(PREFIX, false);
+                    children = zk.getChildren(thisPrefix, false);
                 }
 
                 String firstNodeName = children.stream().min(String::compareTo).get();
@@ -114,7 +135,7 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
                     // no such node exists. wait for it appears
                     CountDownLatch latch = new CountDownLatch(1);
                     // put a watcher
-                    Stat stat = zk.exists(PREFIX + "/" + nextNodeName, event -> {
+                    Stat stat = zk.exists(thisPrefix + "/" + nextNodeName, event -> {
                         if (event.getType() == Watcher.Event.EventType.NodeCreated)
                             latch.countDown();
                     });
@@ -132,9 +153,9 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
 
 
             // set the name of the next node of the queue
-            zk.setData(NEXT_NODE, nextSequentialName(nextNodeName).getBytes(), -1);
-            // remove current node from the queue
-            zk.delete(PREFIX + "/" + nextNodeName, -1);
+            zk.setData(thisNextNode, nextSequentialName(nextNodeName).getBytes(), -1);
+            // dequeue. remove current node from the queue
+            zk.delete(thisPrefix + "/" + nextNodeName, -1);
         } finally {
             if(isLockSet)
                 zkLock.unlock();
@@ -145,14 +166,24 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
 
     private T getObjectByNodeName(String name)
             throws KeeperException, InterruptedException, IOException, ClassNotFoundException {
-        return (T) serializer.deserialize(zk.getData(PREFIX + "/" + name, false, null));
+        return (T) serializer.deserialize(zk.getData(thisPrefix + "/" + name, false, null));
     }
 
     private boolean validName(String nodeName) {
         return nodeName != null && nodeName.trim().length() > 0;
     }
 
+    public void clear() {
+        deleteAll(this.queueName);
+    }
+
     public static void deleteAll() {
         ZkUtil.removeRecursively(PREFIX, false);
+        ZkUtil.removeRecursively(NEXT_NODE, false);
+    }
+
+    public static void deleteAll(String queueName) {
+        ZkUtil.removeRecursively(PREFIX + "/" + queueName, false);
+        ZkUtil.removeRecursively(NEXT_NODE + "/" + queueName, false);
     }
 }

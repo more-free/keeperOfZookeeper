@@ -17,16 +17,39 @@ import static zk.util.Utils.*;
  * Its behavior is just like the "synchronized" keyword
  */
 public class ZkReentrantLock implements ZkLock {
-    private ZooKeeper zk = ZkManager.getInstance();
-    static final String PREFIX = "/zk/internal/util/concurrent/reentrant-lock";
     static final String GROUP = "lock-";
+    static final String PREFIX = "/zk/internal/util/concurrent/reentrant-lock";
+
+    private ZooKeeper zk = ZkManager.getInstance();
 
     private volatile boolean isPathCreated = false;
     private ThreadLocal<String> name = new ThreadLocal<>();
     private ThreadLocal<Boolean> holdTheLock = new ThreadLocal<>();
+    private String lockName = "default";
+    private String thisPrefix;
 
+    /**
+     * all callers compete for the same lock
+     */
     public ZkReentrantLock() {
+        init();
+    }
 
+    /**
+     * compete for the lock with name
+     * @param lockName
+     */
+    public ZkReentrantLock(String lockName) {
+        this.lockName = lockName;
+        init();
+    }
+
+    private void init() {
+        thisPrefix = PREFIX + "/" + lockName;
+    }
+
+    public String getLockName() {
+        return lockName;
     }
 
     @Override
@@ -38,7 +61,7 @@ public class ZkReentrantLock implements ZkLock {
             synchronized (this) {
                 if(!isPathCreated) {
                     try {
-                        createRecursively(PREFIX, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                        createRecursively(thisPrefix, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     } catch(KeeperException | InterruptedException e) {
                         // ignore
                     }
@@ -47,10 +70,11 @@ public class ZkReentrantLock implements ZkLock {
             }
         }
 
-        String fullName = zk.create(PREFIX + "/" + GROUP, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+        String fullName = zk.create(thisPrefix + "/" + GROUP, null,
+                ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
         name.set(lastElement(fullName.split("/")));
 
-        List<String> children = zk.getChildren(PREFIX, false);
+        List<String> children = zk.getChildren(thisPrefix, false);
         Collections.sort(children);
 
         if(name.get().equals(children.get(0))) {
@@ -60,7 +84,7 @@ public class ZkReentrantLock implements ZkLock {
             int prev = children.indexOf(name.get()) - 1;
 
             CountDownLatch latch = new CountDownLatch(1);
-            Stat stat = zk.exists(PREFIX + "/" + children.get(prev), event -> {
+            Stat stat = zk.exists(thisPrefix + "/" + children.get(prev), event -> {
                  if(event.getType() == Watcher.Event.EventType.NodeDeleted) {
                     latch.countDown();
                  }
@@ -82,7 +106,7 @@ public class ZkReentrantLock implements ZkLock {
     public void unlock() throws KeeperException, InterruptedException {
         holdTheLock.set(false);
 
-        zk.delete(PREFIX + "/" + name.get(), -1);
+        zk.delete(thisPrefix + "/" + name.get(), -1);
         name.set(null);
     }
 
@@ -90,8 +114,12 @@ public class ZkReentrantLock implements ZkLock {
         return holdTheLock.get() != null && holdTheLock.get();
     }
 
+
     public static void unlockAll() {
         ZkUtil.removeRecursively(PREFIX, false);
     }
 
+    public static void unlockAll(String lockName) {
+        ZkUtil.removeRecursively(PREFIX + "/" + lockName, false);
+    }
 }
