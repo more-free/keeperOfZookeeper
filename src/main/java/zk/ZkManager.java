@@ -13,26 +13,21 @@ import java.util.concurrent.TimeUnit;
 public class ZkManager {
     private static ZooKeeper zk;
 
-    // thread-safe for single class loader
+    // static initialization is thread-safe for single class loader
     static {
+        init();
+    }
+
+    private static void init() {
         try {
-            zk = new ZooKeeper("localhost:2181", 5000, null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+             zk = new ZooKeeper("localhost:2181", 5000, null);
+         } catch (Exception e) {
+             throw new RuntimeException(e);
+         }
     }
 
     public static ZooKeeper getInstance() {
         return zk;
-    }
-
-    // return a unique id stands for the node
-    public static Integer join(NodeMeta meta) {
-        return null; // TODO
-    }
-
-    public static Boolean decommission(Integer id) {
-        return null; // TODO
     }
 
     public synchronized static void close() throws InterruptedException {
@@ -40,9 +35,7 @@ public class ZkManager {
             zk.close();
     }
 
-    public static void main(String [] args) throws Exception {
-        ZooKeeper zk = getInstance();
-
-        zk.close();
+    public synchronized static void reopen() {
+        init();
     }
 }

@@ -39,8 +39,9 @@ public interface NodeMeta <K, V> {
     public static enum ATTRS {
         IP("ip"),
         PORT("port"),
-        RND_NUM("rnd_num"),
-        TIME("time");
+        TIME("time"),
+        ID("id"),
+        NAME("name");
 
         private String attrName;
         ATTRS(String attrName) {

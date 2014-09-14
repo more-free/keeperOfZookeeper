@@ -51,13 +51,4 @@ public class TestZkReentrantLock {
         threads.stream().forEach(e -> e.start());
         threads.stream().forEach(t -> { try{ t.join(); } catch(Exception e){} });
     }
-
-    //@AfterClass
-    public static void cleanUp() {
-        try {
-            ZkManager.close();
-        } catch(Exception e) {
-
-        }
-    }
 }

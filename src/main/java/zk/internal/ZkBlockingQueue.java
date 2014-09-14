@@ -173,10 +173,6 @@ public class ZkBlockingQueue<T> implements ZkQueue<T> {
         return nodeName != null && nodeName.trim().length() > 0;
     }
 
-    public void clear() {
-        deleteAll(this.queueName);
-    }
-
     public static void deleteAll() {
         ZkUtil.removeRecursively(PREFIX, false);
         ZkUtil.removeRecursively(NEXT_NODE, false);

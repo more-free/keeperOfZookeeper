@@ -74,13 +74,4 @@ public class TestZkBlockingQueue {
         TimeUnit.SECONDS.sleep(5);
 
     }
-
-    @AfterClass
-    public static void cleanUp() {
-        try {
-            ZkManager.close();
-        } catch(Exception e) {
-
-        }
-    }
 }

@@ -114,7 +114,6 @@ public class ZkReentrantLock implements ZkLock {
         return holdTheLock.get() != null && holdTheLock.get();
     }
 
-
     public static void unlockAll() {
         ZkUtil.removeRecursively(PREFIX, false);
     }
