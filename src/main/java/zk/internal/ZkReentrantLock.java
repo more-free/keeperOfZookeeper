@@ -71,35 +71,40 @@ public class ZkReentrantLock implements ZkLock {
         }
 
         String fullName = zk.create(thisPrefix + "/" + GROUP, null,
-                ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+                ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         name.set(lastElement(fullName.split("/")));
 
-        List<String> children = zk.getChildren(thisPrefix, false);
-        Collections.sort(children);
+        waitForLock(name.get(), new CountDownLatch(1));
 
-        if(name.get().equals(children.get(0))) {
-            // hold the lock - simply do nothing and return
+        holdTheLock.set(true);
+    }
+
+    private void waitForLock(String name, CountDownLatch latch) throws KeeperException, InterruptedException {
+        List<String> children = zk.getChildren(thisPrefix, false);
+
+        if(name.equals(minElement(children).get())) {
+            // hold the lock
+            latch.countDown();
         } else {
             // set a watcher
-            int prev = children.indexOf(name.get()) - 1;
+            Stat stat = zk.exists(thisPrefix + "/" + prevElement(children, name).get(),
+                                  event -> {
+                                      if(event.getType() == Watcher.Event.EventType.NodeDeleted) {
+                                          try {
+                                              waitForLock(name, latch);
+                                          } catch (Exception e) {
+                                              throw new RuntimeException(e);
+                                          }
+                                      }
+                                  });
 
-            CountDownLatch latch = new CountDownLatch(1);
-            Stat stat = zk.exists(thisPrefix + "/" + children.get(prev), event -> {
-                 if(event.getType() == Watcher.Event.EventType.NodeDeleted) {
-                    latch.countDown();
-                 }
-            });
-
-            // if the previous node is already gone, then hold the lock directly
-            // this case indicates the previous node already release its lock (and then remove the znode explicitly)
+            // if the previous node was already gone, then check again
             if(stat == null) {
-
+                waitForLock(name, latch);
             } else {
                 latch.await(); // block until receiving the NodeDeleted event of the previous node
             }
         }
-
-        holdTheLock.set(true);
     }
 
     @Override
@@ -121,4 +126,5 @@ public class ZkReentrantLock implements ZkLock {
     public static void unlockAll(String lockName) {
         ZkUtil.removeRecursively(PREFIX + "/" + lockName, false);
     }
+
 }
