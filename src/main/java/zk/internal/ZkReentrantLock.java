@@ -57,11 +57,20 @@ public class ZkReentrantLock implements ZkLock {
         if(checkReentrancy())
             return;  // if already hold the lock, then return instantly
 
+        createPaths();
+        waitForLock(name.get(), new CountDownLatch(1));
+        holdTheLock.set(true);
+    }
+
+    private void createPaths() throws KeeperException, InterruptedException {
         if(!isPathCreated) {
             synchronized (this) {
                 if(!isPathCreated) {
                     try {
-                        createRecursively(thisPrefix, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                        createRecursively(thisPrefix,
+                                          null,
+                                          ZooDefs.Ids.OPEN_ACL_UNSAFE,
+                                          CreateMode.PERSISTENT);
                     } catch(KeeperException | InterruptedException e) {
                         // ignore
                     }
@@ -70,13 +79,12 @@ public class ZkReentrantLock implements ZkLock {
             }
         }
 
-        String fullName = zk.create(thisPrefix + "/" + GROUP, null,
-                ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        String fullName = zk.create(thisPrefix + "/" + GROUP,
+                null,
+                ZooDefs.Ids.OPEN_ACL_UNSAFE,
+                CreateMode.EPHEMERAL_SEQUENTIAL);
+
         name.set(lastElement(fullName.split("/")));
-
-        waitForLock(name.get(), new CountDownLatch(1));
-
-        holdTheLock.set(true);
     }
 
     private void waitForLock(String name, CountDownLatch latch) throws KeeperException, InterruptedException {
@@ -105,6 +113,21 @@ public class ZkReentrantLock implements ZkLock {
                 latch.await(); // block until receiving the NodeDeleted event of the previous node
             }
         }
+    }
+
+    @Override
+    public boolean tryLock() throws KeeperException, InterruptedException {
+        if(checkReentrancy())
+            return true;  // if already hold the lock, then return instantly
+
+        createPaths();
+
+        List<String> children = zk.getChildren(thisPrefix, false);
+        if(name.get().equals(minElement(children).get())) {
+            holdTheLock.set(true);
+            return true;
+        } else
+            return false;
     }
 
     @Override

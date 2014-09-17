@@ -51,4 +51,41 @@ public class TestZkReentrantLock {
         threads.stream().forEach(e -> e.start());
         threads.stream().forEach(t -> { try{ t.join(); } catch(Exception e){} });
     }
+
+
+    @Test
+    public void testTryLock() throws Exception {
+        try {
+            testUnlockAll();
+        } catch(Exception e) {
+
+        }
+
+        ZkReentrantLock lock = new ZkReentrantLock();
+        List<Thread> threads = new ArrayList<>();
+
+        for(int i = 0; i < 5; i++) {
+            String id = "thread-" + i;
+            threads.add(new Thread(() -> {
+                try {
+                    if(lock.tryLock()) {
+                        System.out.println(id + " is holding the lock");
+                    } else {
+                        System.out.println(id + " failed in obtaining the lock");
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    try {
+                        lock.unlock();
+                    } catch(Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }));
+        }
+
+        threads.stream().forEach(e -> e.start());
+        threads.stream().forEach(t -> { try{ t.join(); } catch(Exception e){} });
+    }
 }

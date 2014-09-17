@@ -7,6 +7,6 @@ import org.apache.zookeeper.KeeperException;
  */
 public interface ZkLock {
     void lock() throws KeeperException, InterruptedException;
-
+    boolean tryLock() throws KeeperException, InterruptedException;
     void unlock() throws KeeperException, InterruptedException;
 }
